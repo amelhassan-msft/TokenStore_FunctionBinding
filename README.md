@@ -22,17 +22,17 @@ To use in your custom Azure Functions, simply add the project dll file (TokenSto
 		- Dependencies: Install nuget package for Dropbox.Api
 	- In order for your project to contain a definition for this custom binding, you must add the dll from the TokenStore_FunctionBinding project as an assembly reference 
 		- In your Azure Function App project in visual studios, under the "Solution Explorer" tab, right click on "Dependencies" and choose "Add reference" 
-		<img src="/Images/FunctionApp/addref.png" width="250"> <br />
+		<img align="left" src="/Images/FunctionApp/addref.png" width="250"> <br />
 		- Navigate to the "Browse" tab on the left and click "Browse" on the bottom. 
 		- Find the TokenStoreBindingProject dll (for the locally cloned  TokenStore_FunctionBinding Github repo ) and add it as a reference 
 			- Sample path to dll: C:\Users\[user]\Documents\Github\TokenStore_FunctionBinding\TokenStoreBindingProject\TokenStoreBindingProject\bin\Debug\netstandard2.0\bin\TokenStoreBindingProject.dll
-			<img src="/Images/FunctionApp/adddll.png" width="500"> <br />
+			<img align="left" src="/Images/FunctionApp/adddll.png" width="500"> <br />
 	- If successful, adding the TokenStore Binding should no longer produce an error 
 
 3. Deploying Azure Functions Visual Studio Project to the Azure Portal 
 	- Under the "Build" tab in the visual studios interface, click "Publish [project name]"
 	- Click Start and create a new app 
-		<img src="/Images/Publishing/new.png" width="500"> <br />
+		<img align="left" src="/Images/Publishing/new.png" width="400"> <br />
 	- Choose a name for your app, a subscription, resource group, hosting plan, and azure storage 
 		<img src="/Images/Publishing/options.png" width="500"> <br />
 	- Hit "create". Your app will take a few minutes to deploy. If successful your output console should output a publish success message. 
