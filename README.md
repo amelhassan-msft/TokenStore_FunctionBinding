@@ -9,31 +9,32 @@ To use in your custom Azure Functions, simply add the project dll file (TokenSto
 
 ## ** Step by Step Example: Use a TokenStore input binding to create a timer-triggered Azure Function that lists files in a dropbox account **
 ### * SETUP *
-1. Clone THIS (TokenStore_FunctionBinding) repo to a local directory 
+1. Clone THIS repo (TokenStore_FunctionBinding) to a local directory, open the "TokenStoreBindingProject" in visual studios and build 
 	- Github Repo Link: https://github.com/amelhassan-msft/TokenStore_FunctionBinding.git
 
 2. Create an Azure Function App in Visual Studios 
 	- Notes: Visual Studio version 2019 was used 
 	- Launch Visual Studios and create a new project using the Azure Functions template 
+	<img src="/Images/FunctionApp/newproj.png" width="500"> <br />
 	- For your first function, select the "timer trigger" template, use or create a Storage Account, and set the Authorization level to "Anonymous" <br />
 	- In your timer triggered function, paste the following code 
 		- Source Code: https://github.com/amelhassan-msft/TokenStore_FunctionBinding/blob/master/AzureFunction_Examples/dropbox_timer_example.cs
 		- Dependencies: Install nuget package for Dropbox.Api
 	- In order for your project to contain a definition for this custom binding, you must add the dll from the TokenStore_FunctionBinding project as an assembly reference 
 		- In your Azure Function App project in visual studios, under the "Solution Explorer" tab, right click on "Dependencies" and choose "Add reference" 
-		<img src="/Images/FunctionApp/addref.png" width="500">
+		<img src="/Images/FunctionApp/addref.png" width="250"> <br />
 		- Navigate to the "Browse" tab on the left and click "Browse" on the bottom. 
 		- Find the TokenStoreBindingProject dll (for the locally cloned  TokenStore_FunctionBinding Github repo ) and add it as a reference 
 			- Sample path to dll: C:\Users\[user]\Documents\Github\TokenStore_FunctionBinding\TokenStoreBindingProject\TokenStoreBindingProject\bin\Debug\netstandard2.0\bin\TokenStoreBindingProject.dll
-			<img src="/Images/FunctionApp/adddll.png" width="500">
+			<img src="/Images/FunctionApp/adddll.png" width="500"> <br />
 	- If successful, adding the TokenStore Binding should no longer produce an error 
 
 3. Deploying Azure Functions Visual Studio Project to the Azure Portal 
 	- Under the "Build" tab in the visual studios interface, click "Publish [project name]"
 	- Click Start and create a new app 
-		<img src="/Images/Publishing/options.png" width="500">
+		<img src="/Images/Publishing/new.png" width="500"> <br />
 	- Choose a name for your app, a subscription, resource group, hosting plan, and azure storage 
-		<img src="/Images/Publishing/options.png" width="500">
+		<img src="/Images/Publishing/options.png" width="500"> <br />
 	- Hit "create". Your app will take a few minutes to deploy. If successful your output console should output a publish success message. 
 	- Whenever you make a change to your local Azure Function, use the Publish interface to deploy your changes to your Azure Portal. 
 
@@ -42,9 +43,9 @@ To use in your custom Azure Functions, simply add the project dll file (TokenSto
 	- Set MSI ON 
 		- Find your Azure Function App under the "Function App" tab 
 		- Navigate to the "Platform features" tab and choose "Identity" under "Networking" 
-			<img src="/Images/Auth/path.png" width="500">
+			<img src="/Images/Auth/path.png" width="500"> <br />
 		- Switch system assigned managed identity to "On" and save your changes. 
-			<img src="/Images/Auth/ID.png" width="500">
+			<img src="/Images/Auth/ID.png" width="300"> <br />
 	- Connecting to the dropbox service 
 		- Follow the dropbox example outline here: https://github.com/Azure/azure-tokens/blob/master/docs/service-definition-reference.md
 	- OPTIONAL: If you want to work with Microsoft Graph Services: Set up Azure Active Directory (AAD) 
@@ -59,7 +60,7 @@ To use in your custom Azure Functions, simply add the project dll file (TokenSto
 	- Navigate to http://aka.ms/tokenstorems
 	- Click "Create a resource" and choose Token Store
 	- Select a subscription and resource group (choose the ones used when creating the new Azure Function and Visual Studios), create a Store Name and record for future use, select the desired location. 
-	<img src="/Images/TokenStore/new.png" width="500">
+	<img src="/Images/TokenStore/new.png" width="500"> <br />
 	- Hit "Review + Create" and then "Create" to finalize your Token Store. 
 	- Register apps that are using this Token Store under the "Access Policies" tab (Allows your app to access tokens within this Token Store) 
 		- Example: Authorizing your Azure Function App to use your Token Store
@@ -74,7 +75,7 @@ To use in your custom Azure Functions, simply add the project dll file (TokenSto
 
 ### * RUNNING THE EXAMPLE *
 - After setup is complete, publish your final version of your Azure Function app and run the function in the portal. If successful, your output should looking something like the following: 
-<img src="/Images/output_timer.png" width="500">
+<img src="/Images/output_timer.png" width="700"> <br />
 
 ### * OTHER RESOURCES *
 Other Resources 
