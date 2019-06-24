@@ -14,6 +14,6 @@ This github repo provides a dll for an Azure Function binding that accesses a sp
 			- In your Azure Function App project in visual studios, under the "Solution Explorer" tab, right click on "Dependencies" and choose "Add reference" 
 			- Navigate to the "Browse" tab on the left and click "Browse" on the bottom. 
 			- Find the TokenStoreBindingProject dll (for the locally cloned  TokenStore_FunctionBinding Github repo ) and add it as a reference 
-				- Sample path to dll: C:\Users\[user]\Documents\Github\TokenStore_FunctionBinding\TokenStoreBindingProject\TokenStoreBindingProject\bin\Debug\netstandard2.0\bin
+			  - Sample path to dll: C:\Users\[user]\Documents\Github\TokenStore_FunctionBinding\TokenStoreBindingProject\TokenStoreBindingProject\bin\Debug\netstandard2.0\bin
 	- If successful, adding the TokenStore Binding should no longer produce an error 
 ### * RUNNING THE EXAMPLE *
