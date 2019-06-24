@@ -25,7 +25,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         // Get token ...
         string tokenStoreResource = "https://tokenstore.azure.net";
         // update the below with your resource URL
-        string tokenResourceUrl = $"https://{arg.TokenStore_Name}.westcentralus.tokenstore.azure.net/services/{arg.TokenStore_Service}/tokens/{arg.TokenStore_TokenName}"; // Add variable location? i.e. westcentralus 
+        string tokenResourceUrl = $"https://{arg.TokenStore_Name}.{arg.TokenStore_Location}.tokenstore.azure.net/services/{arg.TokenStore_Service}/tokens/{arg.TokenStore_TokenName}"; // Add variable location? i.e. westcentralus 
 
         var azureServiceTokenProvider = new AzureServiceTokenProvider();
         // Get a token to access Token Store
@@ -44,6 +44,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
             TokenStore_Name_Out = arg.TokenStore_Name,
             TokenStore_Service_Out = arg.TokenStore_Service,
             TokenStore_TokenName_Out = arg.TokenStore_TokenName,
+            TokenStore_Location_Out = arg.TokenStore_Location,
             Obj_ID_Out = arg.Obj_ID,
             Tenant_ID_Out = arg.Tenant_ID,
             outputToken = outputToken
