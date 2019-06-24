@@ -10,7 +10,9 @@ This github repo provides a dll for an Azure Function binding that accesses a sp
 	- Launch Visual Studios and create a new project using the Azure Functions template 
 	- For your first function, select the "Http trigger" template, use or create a Storage Account, and set the Authorization level to "Anonymous" <br />
 		<img src="/Images/FunctionApp/httptrigger.png" width="500">
-	- To your HTTP triggered function, add a TokenStore Binding following the format below
+	- In your HTTP Triggered function, paste the following code 
+		- Source Code: 
+		- Dependencies: Install nuget package for Dropbox.Api
 	- In order for your project to contain a definition for this custom binding, you must add the dll from the TokenStore_FunctionBinding project as an assembly reference 
 		- In your Azure Function App project in visual studios, under the "Solution Explorer" tab, right click on "Dependencies" and choose "Add reference" 
 		- Navigate to the "Browse" tab on the left and click "Browse" on the bottom. 
