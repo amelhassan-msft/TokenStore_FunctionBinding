@@ -8,7 +8,8 @@ This github repo provides a dll for an Azure Function binding that accesses a sp
 2. Create an Azure Function App in Visual Studios 
 	- Notes: Visual Studio version 2019 was used 
 	- Launch Visual Studios and create a new project using the Azure Functions template 
-	-  For your first function, select the "Http trigger" template, use or create a Storage Account, and set the Authorization level to "Anonymous" 
+	- For your first function, select the "Http trigger" template, use or create a Storage Account, and set the Authorization level to "Anonymous" 
+		![http trigger](/images/functionapp/httptrigger.png)
 	- To your HTTP triggered function, add a TokenStore Binding following the format below
 	- In order for your project to contain a definition for this custom binding, you must add the dll from the TokenStore_FunctionBinding project as an assembly reference 
 		- In your Azure Function App project in visual studios, under the "Solution Explorer" tab, right click on "Dependencies" and choose "Add reference" 
