@@ -19,6 +19,7 @@ public static class TestTokenStoreBinding_timer
             using (var dbx = new DropboxClient(tokenbindingoutput.outputToken))
             {
                 var list = await dbx.Files.ListFolderAsync(string.Empty);
+                
 
                 // show folders then files
                 foreach (var item in list.Entries.Where(i => i.IsFolder))

@@ -6,8 +6,8 @@ using Microsoft.Azure.Services.AppAuthentication;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Description;
 using Microsoft.Azure.WebJobs.Host.Bindings;
-using Microsoft.Azure.WebJobs.Host.Config; // must include for IExtensuibConfigProvider 
-//using Microsoft.WindowsAzure.Mobile.Service.Config; // to use, install nuget package Microsoft.WindowsAzure.Mobile.Service.ResourceBroker 
+using Microsoft.Azure.WebJobs.Host.Config; // must include for IExtensionConfigProvider 
+using Newtonsoft.Json;
 
 [Extension("TokenStoreTest")]
 public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
@@ -23,33 +23,100 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     {
 
         // Get token ...
-        string tokenStoreResource = "https://tokenstore.azure.net";
-        // update the below with your resource URL
-        string tokenResourceUrl = $"https://{arg.TokenStore_Name}.{arg.TokenStore_Location}.tokenstore.azure.net/services/{arg.TokenStore_Service}/tokens/{arg.TokenStore_TokenName}"; // Add variable location? i.e. westcentralus 
+        string tokenStoreResource = "https://tokenstore.azure.net"; // Note: Will change soon 
+        string tokenResourceUrl = arg.Token_url;
 
-        var azureServiceTokenProvider = new AzureServiceTokenProvider();
-        // Get a token to access Token Store
+        var outputToken = "NULL"; 
+        
+        // If Flag = "MSI" or "msi" 
+        if (arg.Auth_flag.ToLower() == "msi")
+        {
+            var azureServiceTokenProvider = new AzureServiceTokenProvider();
+            string tokenStoreApiToken = await azureServiceTokenProvider.GetAccessTokenAsync(tokenStoreResource); // Get a token to access Token Store
 
-        string tokenStoreApiToken = await azureServiceTokenProvider.GetAccessTokenAsync(tokenStoreResource);
+            // Get token from Token Store
+            var request = new HttpRequestMessage(HttpMethod.Get, tokenResourceUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenStoreApiToken);
+            HttpClient client = new HttpClient();
+            var response = await client.SendAsync(request);
+            var serviceApiToken = await response.Content.ReadAsStringAsync();
 
-        // Get Dropbox token from Token Vault
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{tokenResourceUrl}/accesstoken");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenStoreApiToken);
-        HttpClient client = new HttpClient();
-        var response = await client.SendAsync(request);
-        var outputToken = await response.Content.ReadAsStringAsync();
+            // Get access token for client to retrieve files 
+            var tokenStoreToken = JsonConvert.DeserializeObject<Token>(serviceApiToken);
+            outputToken = tokenStoreToken.Value.AccessToken;
+
+        }
+        else if (arg.Auth_flag.ToLower() == "user") // If Flag = "USER" or "user" 
+        {
+            // Code for getting token based on user credentials 
+        }
+        else // error, incorrect flag usage 
+            throw new ArgumentException("Incorrect usage of Auth_flag binding input: Choose \"msi\" or \"user\" ");
+
+        // Error: ouputToken is still marked NULL 
+        if (outputToken == "NULL" || string.IsNullOrEmpty(outputToken))
+            throw new ArgumentException("Retrieved token is NULL - Ensure that this token exists and app permissions are enabled");
 
         var output = new TokenBindingOutput
         {
-            TokenStore_Name_Out = arg.TokenStore_Name,
-            TokenStore_Service_Out = arg.TokenStore_Service,
-            TokenStore_TokenName_Out = arg.TokenStore_TokenName,
-            TokenStore_Location_Out = arg.TokenStore_Location,
-            Obj_ID_Out = arg.Obj_ID,
-            Tenant_ID_Out = arg.Tenant_ID,
             outputToken = outputToken
         };
 
         return output;
     }
+}
+
+// Token json object definition 
+public class Token
+
+{
+
+    public string Name { get; set; }
+
+    public string DisplayName { get; set; }
+
+    public string TokenUri { get; set; }
+
+    public string LoginUri { get; set; }
+
+    public TokenValue Value { get; set; }
+
+    public TokenStatus Status { get; set; }
+
+}
+
+
+
+public class TokenValue
+
+{
+
+    public string AccessToken { get; set; }
+
+    public int ExpiresIn { get; set; }
+
+}
+
+
+
+public class TokenStatus
+
+{
+
+    public string State { get; set; }
+
+    public TokenStatusError Error { get; set; }
+
+}
+
+
+
+public class TokenStatusError
+
+{
+
+    public string Code { get; set; }
+
+    public string Message { get; set; }
+
 }
