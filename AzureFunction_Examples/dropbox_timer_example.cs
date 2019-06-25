@@ -8,8 +8,8 @@ public static class TestTokenStoreBinding_timer
 {
     [FunctionName("TestTokenStoreBinding_timer")]
     public static async void Run([TimerTrigger("*/1 * * * * * ")]TimerInfo myTimer, ILogger log,
-        [TokenStoreBinding(TokenStore_Name = "sample-token-store", TokenStore_Service = "dropbox", TokenStore_TokenName = "sampletoken",
-        TokenStore_Location = "westcentralus", Obj_ID = "Sample obj ID", Tenant_ID = "Sample tenant ID")] TokenBindingOutput tokenbindingoutput) // update binding inputs 
+        [TokenStoreBinding(Token_url = "https://sample-token-store.westcentralus.tokenstore.azure.net/services/dropbox/tokens/sampleToken",
+            Auth_flag = "msi")] TokenBindingOutput tokenbindingoutput) // update binding inputs 
     {
         // timer triggered every second (note: may be slowed down since this is an async method)
         log.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
