@@ -7,7 +7,13 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Description;
 using Microsoft.Azure.WebJobs.Host.Bindings;
 using Microsoft.Azure.WebJobs.Host.Config; // must include for IExtensionConfigProvider 
+using Microsoft.Graph;
 using Newtonsoft.Json;
+using System.Linq;
+using Microsoft.Extensions.Primitives;
+
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 [Extension("TokenStoreTest")]
 public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
@@ -26,32 +32,67 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         string tokenStoreResource = "https://tokenstore.azure.net"; // Note: Will change soon 
         string tokenResourceUrl = arg.Token_url;
 
-        var outputToken = "NULL"; 
-        
-        // If Flag = "MSI" or "msi" 
-        if (arg.Auth_flag.ToLower() == "msi")
+        var outputToken = "NULL";
+
+        // Could also have try /catch around [if block]
+        try
         {
-            var azureServiceTokenProvider = new AzureServiceTokenProvider();
-            string tokenStoreApiToken = await azureServiceTokenProvider.GetAccessTokenAsync(tokenStoreResource); // Get a token to access Token Store
+            string IDToken = "NULL";
+            // Extract tenant and object ID 
+            var tenantID = "empty";
+            var objectID = "empty";
 
-            // Get token from Token Store
-            var request = new HttpRequestMessage(HttpMethod.Get, tokenResourceUrl);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenStoreApiToken);
-            HttpClient client = new HttpClient();
-            var response = await client.SendAsync(request);
-            var serviceApiToken = await response.Content.ReadAsStringAsync();
+            if (arg.Auth_flag.ToLower() == "user") // If Flag = "USER" or "user" 
+            {
+                // Get user's AAD ID token from the header 
+                StringValues headerValues;
+                if (arg.Req.Headers.TryGetValue("X-MS-TOKEN-AAD-ID-TOKEN", out headerValues))
+                    IDToken = headerValues.FirstOrDefault();
 
-            // Get access token for client to retrieve files 
-            var tokenStoreToken = JsonConvert.DeserializeObject<Token>(serviceApiToken);
-            outputToken = tokenStoreToken.Value.AccessToken;
+                JwtSecurityTokenHandler JwtHandler = new JwtSecurityTokenHandler();
+                if (!JwtHandler.CanReadToken(IDToken)) 
+                    throw new ArgumentException("ID token cannot be read as JWT");
+                
+                // FIX, validate token here? 
 
+                var securityToken = JwtHandler.ReadJwtToken(IDToken);
+                var payload = securityToken.Payload; // extract payload data 
+
+                foreach (Claim claim in payload.Claims)
+                {
+                    if (claim.Type == "tid")
+                        tenantID = claim.Value;
+                    if (claim.Type == "oid")
+                        objectID = claim.Value;
+                }
+                tokenResourceUrl = $"{arg.Token_url}/tokens/{objectID}"; // uriToken, FIX {tenantID}-{objectID} (too long) 
+            }
+
+            // Shared logic for If Flag = "msi" or "user"
+            if (arg.Auth_flag.ToLower() == "msi" || arg.Auth_flag.ToLower() == "user")
+            {
+                var azureServiceTokenProvider = new AzureServiceTokenProvider();
+                string tokenStoreApiToken = await azureServiceTokenProvider.GetAccessTokenAsync(tokenStoreResource); // Get a token to access Token Store
+
+                // Get token from Token Store
+                var request = new HttpRequestMessage(HttpMethod.Get, tokenResourceUrl);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenStoreApiToken);
+                HttpClient client = new HttpClient();
+                var response = await client.SendAsync(request);
+                var serviceApiToken = await response.Content.ReadAsStringAsync();
+
+                // Get access token for client to retrieve files 
+                var tokenStoreToken = JsonConvert.DeserializeObject<Token>(serviceApiToken);
+                outputToken = tokenStoreToken.Value.AccessToken;
+
+            }
+            else // error, incorrect flag usage 
+                throw new ArgumentException("Incorrect usage of Auth_flag binding input: Choose \"msi\" or \"user\" ");
         }
-        else if (arg.Auth_flag.ToLower() == "user") // If Flag = "USER" or "user" 
+        catch (Exception exp)
         {
-            // Code for getting token based on user credentials 
+            throw new ArgumentException($"{exp}");
         }
-        else // error, incorrect flag usage 
-            throw new ArgumentException("Incorrect usage of Auth_flag binding input: Choose \"msi\" or \"user\" ");
 
         // Error: ouputToken is still marked NULL 
         if (outputToken == "NULL" || string.IsNullOrEmpty(outputToken))
@@ -70,7 +111,6 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
 public class Token
 
 {
-
     public string Name { get; set; }
 
     public string DisplayName { get; set; }
@@ -85,38 +125,27 @@ public class Token
 
 }
 
-
-
 public class TokenValue
 
 {
-
     public string AccessToken { get; set; }
 
     public int ExpiresIn { get; set; }
-
 }
-
 
 
 public class TokenStatus
 
 {
-
     public string State { get; set; }
 
     public TokenStatusError Error { get; set; }
-
 }
-
-
 
 public class TokenStatusError
 
 {
-
     public string Code { get; set; }
 
     public string Message { get; set; }
-
 }
