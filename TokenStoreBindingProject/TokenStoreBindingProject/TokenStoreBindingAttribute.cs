@@ -24,7 +24,7 @@ namespace Microsoft.Azure.WebJobs
     using System;
 
     [Binding]
-    public sealed class TokenStoreBindingAttribute : Attribute, IDisposable
+    public sealed class TokenStoreBindingAttribute : Attribute
     {
         [AutoResolve]
         public string Token_url { get; set; }
@@ -38,15 +38,10 @@ namespace Microsoft.Azure.WebJobs
             Auth_flag = Auth_flag_in;
             Req = req_in;
         }
-        public TokenStoreBindingAttribute() // For imperative bindings, constructor
+        public TokenStoreBindingAttribute() // For declarative bindings, constructor
         {
 
         }
 
-        // Dispose method needed for implicit use of Token Store binding 
-        public void Dispose()
-        {
-
-        }
     }
 }
