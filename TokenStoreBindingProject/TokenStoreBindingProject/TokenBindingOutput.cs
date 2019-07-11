@@ -1,5 +1,5 @@
 ﻿using System;
-public class TokenBindingOutput : IDisposable
+public class TokenBindingOutput : IDisposable // Use this output type for including more information (currently not used, output token is just a string) 
 {
     public string outputToken { get; set; }
 

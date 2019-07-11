@@ -22,19 +22,18 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     public void Initialize(ExtensionConfigContext context)
     {
         var rule = context.AddBindingRule<TokenStoreBindingAttribute>();
-        rule.BindToInput<TokenBindingOutput>(BuildItemFromAttribute);
+        rule.BindToInput<String>(BuildItemFromAttribute); // was TokenBindingOutput
     }
 
-    private async Task<TokenBindingOutput> BuildItemFromAttribute(TokenStoreBindingAttribute arg, ValueBindingContext arg2)
+    private async Task<String> BuildItemFromAttribute(TokenStoreBindingAttribute arg, ValueBindingContext arg2)
     {
 
         // Get token ...
-        string tokenStoreResource = "https://tokenstore.azure.net"; // Note: Will change soon 
-        string tokenResourceUrl = arg.Token_url;
+        string tokenStoreResource = "https://tokenstore.azure.net"; // Note: Changed to "https://{token-store-name}.tokenstore.azure.net (extract from the url???) 
+        string tokenResourceUrl = arg.Token_url; // Note: The resource url no longer contains the location 
 
         var outputToken = "NULL";
 
-        // Could also have try /catch around [if block]
         try
         {
             string IDToken = "NULL";
@@ -52,8 +51,6 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
                 JwtSecurityTokenHandler JwtHandler = new JwtSecurityTokenHandler();
                 if (!JwtHandler.CanReadToken(IDToken)) 
                     throw new ArgumentException("ID token cannot be read as JWT");
-                
-                // FIX, validate token here? 
 
                 var securityToken = JwtHandler.ReadJwtToken(IDToken);
                 var payload = securityToken.Payload; // extract payload data 
@@ -98,12 +95,12 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         if (outputToken == "NULL" || string.IsNullOrEmpty(outputToken))
             throw new ArgumentException("Retrieved token is NULL - Ensure that this token exists and app permissions are enabled");
 
-        var output = new TokenBindingOutput
-        {
-            outputToken = outputToken
-        };
+    /*var output = new TokenBindingOutput // use for more detailed type 
+    {
+        outputToken = outputToken
+    };*/
 
-        return output;
+        return outputToken;
     }
 }
 
