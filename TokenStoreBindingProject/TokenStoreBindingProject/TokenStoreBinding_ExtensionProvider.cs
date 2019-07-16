@@ -14,6 +14,7 @@ using Microsoft.Extensions.Primitives;
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Web;
 
 [Extension("TokenStoreTest")]
 public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
@@ -22,32 +23,29 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     public void Initialize(ExtensionConfigContext context)
     {
         var rule = context.AddBindingRule<TokenStoreBindingAttribute>();
-        rule.BindToInput<String>(BuildItemFromAttribute); // was TokenBindingOutput
+        rule.BindToInput<String>(BuildItemFromAttribute); // <{output type of binding}>
     }
 
     private async Task<String> BuildItemFromAttribute(TokenStoreBindingAttribute arg, ValueBindingContext arg2)
     {
+        // Extract resource url from provided url path to token 
+        Uri tokenURI = new Uri(arg.Token_url);
+        string path = tokenURI.Authority;
+        string tokenStoreResource = $"https://{tokenURI.Authority}"; // Format: "https://{token-store-name}.tokenstore.azure.net"
+        string tokenResourceUrl = arg.Token_url; 
 
-        // Get token ...
-        string tokenStoreResource = "https://tokenstore.azure.net"; // Note: Changed to "https://{token-store-name}.tokenstore.azure.net (extract from the url???) 
-        string tokenResourceUrl = arg.Token_url; // Note: The resource url no longer contains the location 
-
-        var outputToken = "NULL";
+        string outputToken = null;
 
         try
         {
-            string IDToken = "NULL";
+            string IDToken = null;
             // Extract tenant and object ID 
-            var tenantID = "empty";
-            var objectID = "empty";
+            string tenantID = null;
+            string objectID = null;
 
             if (arg.Auth_flag.ToLower() == "user") // If Flag = "USER" or "user" 
             {
-                // Get user's AAD ID token from the header 
-                StringValues headerValues;
-                if (arg.Req.Headers.TryGetValue("X-MS-TOKEN-AAD-ID-TOKEN", out headerValues))
-                    IDToken = headerValues.FirstOrDefault();
-
+                IDToken = arg.EasyAuthAccessToken; // this is an AAD ID header token 
                 JwtSecurityTokenHandler JwtHandler = new JwtSecurityTokenHandler();
                 if (!JwtHandler.CanReadToken(IDToken)) 
                     throw new ArgumentException("ID token cannot be read as JWT");
@@ -62,10 +60,16 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
                     if (claim.Type == "oid")
                         objectID = claim.Value;
                 }
-                tokenResourceUrl = $"{arg.Token_url}/tokens/{objectID}"; // uriToken, FIX {tenantID}-{objectID} (too long) 
+
+                if (tenantID == null)
+                    throw new ArgumentException("TenantID cannot be read");
+                else if (objectID == null)
+                    throw new ArgumentException("ObjectID cannot be read");
+                else
+                    tokenResourceUrl = $"{arg.Token_url}/tokens/{objectID}"; // uriToken, TODO: Naming convention should be {tenantID}-{objectID} (currently too long)
             }
 
-            // Shared logic for If Flag = "msi" or "user"
+            // Shared logic for If Auth_Flag = "msi" or "user"
             if (arg.Auth_flag.ToLower() == "msi" || arg.Auth_flag.ToLower() == "user")
             {
                 var azureServiceTokenProvider = new AzureServiceTokenProvider();
@@ -75,14 +79,29 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
                 var request = new HttpRequestMessage(HttpMethod.Get, tokenResourceUrl);
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenStoreApiToken);
                 HttpClient client = new HttpClient();
-                var response = await client.SendAsync(request);
-                var serviceApiToken = await response.Content.ReadAsStringAsync();
+                HttpResponseMessage response = await client.SendAsync(request);
 
-                // Get access token for client to retrieve files 
-                var tokenStoreToken = JsonConvert.DeserializeObject<Token>(serviceApiToken);
-                outputToken = tokenStoreToken.Value.AccessToken;
+                Token tokenStoreToken;
+                if (response.IsSuccessStatusCode)
+                {
+                    var serviceApiToken = await response.Content.ReadAsStringAsync();
 
-            }
+                    // Get access token for client to retrieve files 
+                    tokenStoreToken = JsonConvert.DeserializeObject<Token>(serviceApiToken);
+
+                    try
+                    {
+                        outputToken = tokenStoreToken.Value.AccessToken;
+                    }
+                        
+                    catch
+                    {
+                        throw new ArgumentException($"Token Store toke status message: {tokenStoreToken.Status.Error.Message}");
+                    }
+                }
+                else
+                    throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}"); 
+                }
             else // error, incorrect flag usage 
                 throw new ArgumentException("Incorrect usage of Auth_flag binding input: Choose \"msi\" or \"user\" ");
         }
@@ -92,13 +111,8 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         }
 
         // Error: ouputToken is still marked NULL 
-        if (outputToken == "NULL" || string.IsNullOrEmpty(outputToken))
-            throw new ArgumentException("Retrieved token is NULL - Ensure that this token exists and app permissions are enabled");
-
-    /*var output = new TokenBindingOutput // use for more detailed type 
-    {
-        outputToken = outputToken
-    };*/
+        if (outputToken == null)
+            throw new ArgumentException("Retrieved token is NULL - Ensure that this token exists and is logged in");
 
         return outputToken;
     }
