@@ -15,6 +15,8 @@ using Microsoft.Extensions.Primitives;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Web;
+using Newtonsoft.Json.Linq;
+using System.Text;
 
 [Extension("TokenStoreTest")]
 public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
@@ -82,26 +84,41 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
                 HttpResponseMessage response = await client.SendAsync(request);
 
                 Token tokenStoreToken;
-                if (response.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode) // Specified token exists 
                 {
-                    var serviceApiToken = await response.Content.ReadAsStringAsync();
+                    var serviceApiToken = await response.Content.ReadAsStringAsync(); 
+                    tokenStoreToken = JsonConvert.DeserializeObject<Token>(serviceApiToken); // Access token to specified service 
 
-                    // Get access token for client to retrieve files 
-                    tokenStoreToken = JsonConvert.DeserializeObject<Token>(serviceApiToken);
-
-                    try
+                    try // Get token if it exists
                     {
                         outputToken = tokenStoreToken.Value.AccessToken;
+                        return outputToken;
                     }
                         
                     catch
                     {
-                        throw new ArgumentException($"Token Store toke status message: {tokenStoreToken.Status.Error.Message}");
+                        throw new ArgumentException($"Token Store token status message: {tokenStoreToken.Status.Error.Message}"); // If token already exists, but is not authenticated 
                     }
                 }
-                else
-                    throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}"); 
-                }
+                else // Specified token does not exist, create token 
+                    request = new HttpRequestMessage(HttpMethod.Put, tokenResourceUrl);
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenStoreApiToken);
+
+                    var tokenId = "newtoken"; // TODO: FIX (make it more specific to the scienario?) -> Maybe a random display name instead ? 
+                    var requestContent = JObject.FromObject(new
+                    {
+                        displayName = tokenId 
+                    });
+
+                    request.Content = new StringContent(requestContent.ToString(), Encoding.UTF8, "application/json");
+                    var resp = await client.SendAsync(request);
+                    var responseStr = await resp.Content.ReadAsStringAsync(); // Provides details of created token 
+
+                    //tokenStoreToken = JsonConvert.DeserializeObject<Token>(responseStr);
+                    //outputToken = tokenStoreToken.Value.AccessToken;
+                    throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. Specified token does not exist. A new token with displayname {tokenId} was created. Navagiate to your Token Store to login. Further details: {responseStr}"); 
+                    // would it be possible to redirect user to something like this: https://ameltokenstore.tokenstore.azure.net/services/dropbox/tokens/a86c35dd-68a5-4668-9fae-2e7743c4feef/login
+            }
             else // error, incorrect flag usage 
                 throw new ArgumentException("Incorrect usage of Auth_flag binding input: Choose \"msi\" or \"user\" ");
         }
@@ -110,11 +127,6 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
             throw new ArgumentException($"{exp}");
         }
 
-        // Error: ouputToken is still marked NULL 
-        if (outputToken == null)
-            throw new ArgumentException("Retrieved token is NULL - Ensure that this token exists and is logged in");
-
-        return outputToken;
     }
 }
 
