@@ -38,6 +38,7 @@ namespace Microsoft.Azure.WebJobs
         // INPUT PARAMETERS 
         [AutoResolve]
         public string Token_url { get; set; }
+        [AutoResolve (Default = "msi")]
         public string Auth_flag { get; set; }
 
 
