@@ -35,12 +35,13 @@ namespace Microsoft.Azure.WebJobs
         [AutoResolve(ResolutionPolicyType = typeof(EasyAuthAccessTokenResolutionPolicy))]  
         public string EasyAuthAccessToken { get; set; } = "auto"; // Needs to be set to non-null value to be resolved, where the return value for token is stored 
 
-        // INPUT PARAMETERS 
+        // **** INPUT PARAMETERS ****
         [AutoResolve]
         public string Token_url { get; set; }
         [AutoResolve (Default = "msi")]
         public string Auth_flag { get; set; } // options: msi or user 
         public ID_Providers Identity_provider { get; set; } // options: aad, google, or facebook (see enum definition below) 
+        // ****************************
 
         public TokenStoreBindingAttribute(string Token_url_in, string Auth_flag_in, ID_Providers Identity_provider_in) // For imperative bindings, constructor
         {
@@ -81,7 +82,7 @@ namespace Microsoft.Azure.WebJobs
                 string errorMessage = "Failed accessing request header. Cannot find an access token for the user. Verify that this endpoint is protected by Azure App Service Authentication/Authorization.";
                 StringValues headerValues;
 
-                switch(Identity_provider) // TODO: Enums should not be case sensitive, also in extension provider make sure to parse the token accordingly (remove @ if necessary) 
+                switch(Identity_provider)
                 {
                     case ID_Providers.aad:
                         if (request.Headers.TryGetValue("X-MS-TOKEN-AAD-ID-TOKEN", out headerValues)) 
@@ -96,7 +97,7 @@ namespace Microsoft.Azure.WebJobs
                             return headerValues.ToString();
                         break;
                     default:
-                        throw new InvalidOperationException("Incorrect usage of Identity_provider parameter. Input must be of type ID_providers enum which currently supports aad, facebook, and google");
+                        throw new InvalidOperationException("Incorrect usage of Identity_provider parameter. Input must be of type ID_providers enum which currently supports AAD, Facebook, and Google");
                 }
                 throw new InvalidOperationException(errorMessage);
             }

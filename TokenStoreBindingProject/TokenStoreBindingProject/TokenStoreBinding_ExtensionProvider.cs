@@ -17,6 +17,8 @@ using System.Security.Claims;
 using System.Web;
 using Newtonsoft.Json.Linq;
 using System.Text;
+using Facebook;
+using System.Collections.Generic;
 
 [Extension("TokenStoreTest")]
 public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
@@ -34,7 +36,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         string tokenStoreApiToken = await azureServiceTokenProvider.GetAccessTokenAsync(tokenStoreResource); // Get a token to access Token Store
 
         // Get token from Token Store
-        var request = new HttpRequestMessage(HttpMethod.Get, tokenResourceUrl);
+        var request = new HttpRequestMessage(System.Net.Http.HttpMethod.Get, tokenResourceUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenStoreApiToken);
         HttpClient client = new HttpClient();
         HttpResponseMessage response = await client.SendAsync(request);
@@ -63,7 +65,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     public async void create_token(string tokenResourceUrl, string tokenStoreApiToken, string tokenStoreResource)
     {
         HttpClient client = new HttpClient();
-        var request = new HttpRequestMessage(HttpMethod.Put, tokenResourceUrl);
+        var request = new HttpRequestMessage(System.Net.Http.HttpMethod.Put, tokenResourceUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenStoreApiToken);
 
         // Get token name based on url 
@@ -84,19 +86,25 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         else  // msi does not have permission to create tokens in this token store 
             throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. MSI does not have \"create\" permission for the following token store: {tokenStoreResource}. Further details: {responseStr}");
         
-        //tokenStoreToken = JsonConvert.DeserializeObject<Token>(responseStr);
-        //outputToken = tokenStoreToken.Value.AccessToken;
+        // tokenStoreToken = JsonConvert.DeserializeObject<Token>(responseStr);
+        // outputToken = tokenStoreToken.Value.AccessToken;
         // would it be possible to redirect user to something like this: https://ameltokenstore.tokenstore.azure.net/services/dropbox/tokens/a86c35dd-68a5-4668-9fae-2e7743c4feef/login
     }
 
     // ***************************************************************************************************************************************************
     // ***************************** Functions to deal with headers and extract token name based on ID Provider ******************************************
-    public string get_aad_tokenpath(JwtPayload header_payload, TokenStoreBindingAttribute arg) // Token name based on tenant and object IDs 
+    public string get_aad_tokenpath(string header_token, TokenStoreBindingAttribute arg) // Token name based on tenant and object IDs 
     {
+        JwtSecurityTokenHandler JwtHandler = new JwtSecurityTokenHandler();
+        if (!JwtHandler.CanReadToken(header_token))
+            throw new ArgumentException("AAD ID token cannot be read as JWT");
+
+        var securityToken = JwtHandler.ReadJwtToken(header_token);
+        var payload = securityToken.Payload; // extract payload data 
         string tenantID = null;
         string objectID = null;
 
-        foreach (Claim claim in header_payload.Claims)
+        foreach (Claim claim in payload.Claims)
         {
             if (claim.Type == "tid")
                 tenantID = claim.Value;
@@ -109,61 +117,73 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         else if (objectID == null)
             throw new ArgumentException("AAD Token Error: ObjectID cannot be read");
         else
-            return $"{arg.Token_url}/tokens/{objectID}"; // uriToken, TODO: Naming convention should be {tenantID}-{objectID} (currently too long)
+            return $"{arg.Token_url}/tokens/{objectID}"; // token uri, TODO: Naming convention should be {tenantID}-{objectID} (currently too long)
     }
 
-    public string get_facebook_tokenpath(JwtPayload header_payload, TokenStoreBindingAttribute arg)
+    public string get_facebook_tokenpath(string header_token, TokenStoreBindingAttribute arg)
     {
-        // Token name based on user name 
-        return "NULL";
+        try
+        {
+            var fb = new FacebookClient(header_token);
+            var result = (IDictionary<string, object>)fb.Get("/me?fields=id");
+            return $"{arg.Token_url}/tokens/{(string)result["id"]}"; // Token uri 
+        }
+        catch (FacebookOAuthException)
+        {
+            throw new ArgumentException("Could not read user id from Facebook access token.");
+        }
     }
 
-    public string get_google_tokenpath(JwtPayload header_payload, TokenStoreBindingAttribute arg) // Token name based on sub (i.e. the google user id) 
+    public string get_google_tokenpath(string header_token, TokenStoreBindingAttribute arg) // Token name based on sub (i.e. the google user id) 
     {
+        JwtSecurityTokenHandler JwtHandler = new JwtSecurityTokenHandler();
+        if (!JwtHandler.CanReadToken(header_token))
+            throw new ArgumentException("Google ID token cannot be read as JWT");
+
+        var securityToken = JwtHandler.ReadJwtToken(header_token);
+        var payload = securityToken.Payload; // extract payload data 
+
         string user_id = null;
 
-        foreach (Claim claim in header_payload.Claims)
+        foreach (Claim claim in payload.Claims)
         {
             if (claim.Type == "sub")
                 user_id = claim.Value;
         }
-        return $"{arg.Token_url}/tokens/{user_id}";
+
+        if (user_id == null)
+            throw new ArgumentException("Could not read user id from Google ID token.");
+        return $"{arg.Token_url}/tokens/{user_id}"; // Token uri 
     }
 
-    // ********************************************************************************************************************
+    // ***********************************************************************************************************************************************
 
-    // ******************************************* Main Function ***********************************************************
+    // ******************************************* MAIN FUNCTION: TokenStore Binding Logic ***********************************************************
     private async Task<String> BuildItemFromAttribute(TokenStoreBindingAttribute arg, ValueBindingContext arg2)
     {
         // Extract resource url from provided url path to token 
         Uri tokenURI = new Uri(arg.Token_url);
         string path = tokenURI.Authority;
         string tokenStoreResource = $"https://{tokenURI.Authority}"; // Format: "https://{token-store-name}.tokenstore.azure.net"
-        string tokenResourceUrl = arg.Token_url; // for user scienario only specify path up to service 
+        string tokenResourceUrl = arg.Token_url; // for user scienario only specify path up to service, for msi scienario specify path up to token name  
 
         try
         {
             if (arg.Auth_flag.ToLower() == "user") // If Flag = "USER" or "user" 
             {
-                string IDToken = arg.EasyAuthAccessToken; // access or ID token retrieved from header
-                JwtSecurityTokenHandler JwtHandler = new JwtSecurityTokenHandler();
-                if (!JwtHandler.CanReadToken(IDToken)) 
-                    throw new ArgumentException("ID token cannot be read as JWT");
-
-                var securityToken = JwtHandler.ReadJwtToken(IDToken);
-                var payload = securityToken.Payload; // extract payload data 
+                string header_token = arg.EasyAuthAccessToken; // Access or ID token retrieved from header
 
                 // Build path to token 
-                switch (arg.Identity_provider) // TODO: Enums should not be case sensitive
+                switch (arg.Identity_provider) 
                 {
                     case ID_Providers.aad:
-                        tokenResourceUrl = get_aad_tokenpath(payload, arg);
+                        tokenResourceUrl = get_aad_tokenpath(header_token, arg);
                         break;
                     case ID_Providers.facebook:
-                        tokenResourceUrl = get_facebook_tokenpath(payload, arg);
+                        tokenResourceUrl = get_facebook_tokenpath(header_token, arg);
                         break;
                     case ID_Providers.google:
-                        tokenResourceUrl = get_google_tokenpath(payload, arg);
+                        tokenResourceUrl = get_google_tokenpath(header_token, arg);
                         break;
                     default:
                         throw new InvalidOperationException("Incorrect usage of Identity_provider parameter. Input must be of type ID_providers enum which currently supports aad, facebook, and google");
