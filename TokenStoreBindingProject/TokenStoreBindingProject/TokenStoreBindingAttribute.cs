@@ -27,6 +27,7 @@ namespace Microsoft.Azure.WebJobs
     using Microsoft.Graph;
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Reflection;
 
     [Binding]
@@ -40,10 +41,11 @@ namespace Microsoft.Azure.WebJobs
         public string Token_url { get; set; }
         [AutoResolve (Default = "msi")]
         public string Auth_flag { get; set; } // options: msi or user 
-        public ID_Providers Identity_provider { get; set; } // options: aad, google, or facebook (see enum definition below) 
+        [AutoResolve(Default = "aad")]
+        public string Identity_provider { get; set; } // options: aad, google, or facebook (see enum definition below) 
         // ****************************
 
-        public TokenStoreBindingAttribute(string Token_url_in, string Auth_flag_in, ID_Providers Identity_provider_in) // For imperative bindings, constructor
+        public TokenStoreBindingAttribute(string Token_url_in, string Auth_flag_in, string Identity_provider_in) // For imperative bindings, constructor
         {
             Token_url = Token_url_in;
             Auth_flag = Auth_flag_in;
@@ -77,28 +79,29 @@ namespace Microsoft.Azure.WebJobs
                 return "NULL"; // Header value is not required for an Auth_flag of "msi" 
             }
 
-            private string GetEasyAuthAccessToken(HttpRequest request, ID_Providers Identity_provider)
+            private string GetEasyAuthAccessToken(HttpRequest request, string Identity_provider)
             {
-                string errorMessage = "Failed accessing request header. Cannot find an access token for the user. Verify that this endpoint is protected by Azure App Service Authentication/Authorization.";
+                string errorMessage = $"Failed accessing request header. Cannot find an access token for the user. Verify that this endpoint is protected by the specified identity provider: {Identity_provider}.";
                 StringValues headerValues;
 
-                switch(Identity_provider)
+                switch(Identity_provider.ToLower())
                 {
-                    case ID_Providers.aad:
-                        if (request.Headers.TryGetValue("X-MS-TOKEN-AAD-ID-TOKEN", out headerValues)) 
+                    case "aad":
+                        if (request.Headers.TryGetValue("X-MS-TOKEN-AAD-ID-TOKEN", out headerValues))
                             return headerValues.ToString();
                         break;
-                    case ID_Providers.facebook:
+                    case "facebook":
                         if (request.Headers.TryGetValue("X-MS-TOKEN-FACEBOOK-ACCESS-TOKEN", out headerValues))
                             return headerValues.ToString();
                         break;
-                    case ID_Providers.google:
+                    case "google":
                         if (request.Headers.TryGetValue("X-MS-TOKEN-GOOGLE-ID-TOKEN", out headerValues))
-                            return headerValues.ToString();
+                            return headerValues.FirstOrDefault();
                         break;
                     default:
-                        throw new InvalidOperationException("Incorrect usage of Identity_provider parameter. Input must be of type ID_providers enum which currently supports AAD, Facebook, and Google");
+                        throw new InvalidOperationException("Incorrect usage of Identity_provider parameter. Input must be of type string: \"aad\", \"facebook\", and \"google\" ");
                 }
+
                 throw new InvalidOperationException(errorMessage);
             }
   

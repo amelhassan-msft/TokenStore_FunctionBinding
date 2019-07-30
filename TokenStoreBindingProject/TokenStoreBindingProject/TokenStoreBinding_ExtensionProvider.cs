@@ -57,12 +57,12 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
                 throw new ArgumentException($"Token Store token status message: {tokenStoreToken.Status.Error.Message}"); // If token already exists, but is not authenticated 
             }
         }
-        else // Specified token does not exist or msi does not have permission to "get" tokens, so try to create a token keeping in mind that msi might not have permission to "create" tokens 
-            create_token(tokenResourceUrl, tokenStoreApiToken, tokenStoreResource);
-
-        return null; // output token could not be accessed 
+        else
+        { // Specified token does not exist or msi does not have permission to "get" tokens, so try to create a token keeping in mind that msi might not have permission to "create" tokens 
+                throw(await create_token(tokenResourceUrl, tokenStoreApiToken, tokenStoreResource));
+        }
     }
-    public async void create_token(string tokenResourceUrl, string tokenStoreApiToken, string tokenStoreResource)
+    public async Task<Exception> create_token(string tokenResourceUrl, string tokenStoreApiToken, string tokenStoreResource)
     {
         HttpClient client = new HttpClient();
         var request = new HttpRequestMessage(System.Net.Http.HttpMethod.Put, tokenResourceUrl);
@@ -79,12 +79,12 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
 
         request.Content = new StringContent(requestContent.ToString(), Encoding.UTF8, "application/json");
         var response = await client.SendAsync(request);
-        var responseStr = await response.Content.ReadAsStringAsync(); // Provides details of created token 
+        var responseStr = await response.Content.ReadAsStringAsync(); // Provides details of created token
 
         if (response.IsSuccessStatusCode) // Token was succesfully created 
             throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. Specified token does not exist. A new token with displayname {tokenId} was created. Navagiate to your Token Store to login. Further details: {responseStr}");
         else  // msi does not have permission to create tokens in this token store 
-            throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. MSI does not have \"create\" permission for the following token store: {tokenStoreResource}. Further details: {responseStr}");
+            throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. MSI does not have \"get\" and/or \"create\" permission for the following token store: {tokenStoreResource}. Further details: {responseStr}");
         
         // tokenStoreToken = JsonConvert.DeserializeObject<Token>(responseStr);
         // outputToken = tokenStoreToken.Value.AccessToken;
@@ -172,17 +172,16 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
             if (arg.Auth_flag.ToLower() == "user") // If Flag = "USER" or "user" 
             {
                 string header_token = arg.EasyAuthAccessToken; // Access or ID token retrieved from header
-
                 // Build path to token 
-                switch (arg.Identity_provider) 
+                switch (arg.Identity_provider.ToLower()) 
                 {
-                    case ID_Providers.aad:
+                    case "aad":
                         tokenResourceUrl = get_aad_tokenpath(header_token, arg);
                         break;
-                    case ID_Providers.facebook:
+                    case "facebook":
                         tokenResourceUrl = get_facebook_tokenpath(header_token, arg);
                         break;
-                    case ID_Providers.google:
+                    case "google":
                         tokenResourceUrl = get_google_tokenpath(header_token, arg);
                         break;
                     default:
@@ -193,7 +192,14 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
             // Shared logic for If Auth_Flag = "msi" or "user"
             if (arg.Auth_flag.ToLower() == "msi" || arg.Auth_flag.ToLower() == "user")
             {
-                return await get_or_create_token(tokenResourceUrl, tokenStoreResource);
+                try
+                {
+                    return await get_or_create_token(tokenResourceUrl, tokenStoreResource);
+                }
+                catch(Exception exp)
+                {
+                    throw new ArgumentException($"{exp}");
+                }
             }
             else // error, incorrect usage of Auth_flag binding input  
                 throw new ArgumentException("Incorrect usage of Auth_flag binding input: Choose \"msi\" or \"user\" ");
