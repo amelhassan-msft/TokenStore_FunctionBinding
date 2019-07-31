@@ -4,17 +4,14 @@
 Usage: 
 
 If Auth_Flag = MSI
-    1. Token Store can be used as an imperative binding or a declarative binding (i.e. can be used as direct input param to your Azure Function)
-    2. Token_url should be the full path to the token ( i.e. https://{example-tokenstore-name}.{example-location}.tokenstore.azure.net/services/{example-service}/tokens/{example-token-name} )
-    3. Do NOT set the "Req" parameter 
-If Auth_Flag = user
-    1. Token Store binding can ONLY be used as an imperative binding  
-    2. Your Azure Function must have an HTTP trigger 
-    3. Token Store binding can only be executed at runtime because the req parameters depends on the HTTP trigger output to access the headers 
-    4. Token_url should be path upto service ( i.e. https://{example-tokenstore-name}.{example-location}.tokenstore.azure.net/services/{example-service} )
+    1. Your Azure Function can be of any type 
+    2. Token_url should be the full path to the token ( i.e. https://{example-tokenstore-name}.tokenstore.azure.net/services/{example-service}/tokens/{example-token-name} )
+If Auth_Flag = user 
+    1. Your Azure Function must have an HTTP trigger 
+    2. Token_url should be path up to service ( i.e. https://{example-tokenstore-name}.tokenstore.azure.net/services/{example-service} )
+    3. Be sure to specify the "Id_provider" parameter
 
-Reference (declartive vs. imperative bindings): https://docs.microsoft.com/en-us/azure/azure-functions/functions-dotnet-class-library
-
+Returns: An access token to the specified service if it exists and is authenticated. 
 */
 
 namespace Microsoft.Azure.WebJobs
@@ -24,11 +21,11 @@ namespace Microsoft.Azure.WebJobs
     using Microsoft.Azure.WebJobs.Host.Bindings;
     using Microsoft.Azure.WebJobs.Host.Bindings.Path;
     using Microsoft.Extensions.Primitives;
-    using Microsoft.Graph;
     using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
+    using System.Text.RegularExpressions;
 
     [Binding]
     public sealed class TokenStoreBindingAttribute : Attribute
@@ -56,12 +53,33 @@ namespace Microsoft.Azure.WebJobs
         [AutoResolve(Default = "aad")]
         public string Identity_provider { get; set; } // options: aad, google, or facebook
 
-        // ****************************
+        public void CheckValidity_URL()
+        {
+            var msi_regex = "^https://[a-zA-Z0-9_.-]*.tokenstore.azure.net/services/[a-zA-Z0-9_.-]*/tokens/[a-zA-Z0-9_.-]*$";
+            var user_regex = "^https://[a-zA-Z0-9_.-]*.tokenstore.azure.net/services/[a-zA-Z0-9_.-]*$";
 
-        /// <summary>
-        /// Constructor for imperative bindings. 
-        /// </summary>
-        public TokenStoreBindingAttribute(string Token_url_in, string Auth_flag_in, string Identity_provider_in) 
+            switch (this.Auth_flag.ToLower())
+            {
+                case "msi":
+                    Match match_msi = Regex.Match(this.Token_url, msi_regex);
+                    if (!match_msi.Success)
+                        throw new FormatException("When using an Auth_flag of \"msi\" specify the token url up to the token name. Format: \"https://{token-store-name}.tokenstore.azure.net/services/{service-name}/tokens/{token-name}\" ");
+                    break;
+                case "user":
+                    Match match_user = Regex.Match(this.Token_url, user_regex);
+                    if (!match_user.Success)
+                        throw new FormatException("When using an Auth_flag of \"user\" specify the token url up to the service name. Format: \"https://{token-store-name}.tokenstore.azure.net/services/{service-name}\" ");
+                    break;
+                default:
+                    break;
+            }
+        }
+            // ****************************
+
+            /// <summary>
+            /// Constructor for imperative bindings. 
+            /// </summary>
+            public TokenStoreBindingAttribute(string Token_url_in, string Auth_flag_in, string Identity_provider_in) 
         {
             Token_url = Token_url_in;
             Auth_flag = Auth_flag_in;

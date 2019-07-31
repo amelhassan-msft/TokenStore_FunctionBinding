@@ -29,7 +29,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     // ******************************************** Token Store Helper Functions ********************************************************
 
     /// <summary>
-    /// Get a token if it exists, otherwise create a token and prompt user to navigate to Token Store and login.  
+    /// Get a token if it exists, otherwise create a token and prompt user to navigate to Token Store to login.  
     /// </summary>
     public async Task<String> get_or_create_token(string tokenResourceUrl, string tokenStoreResource)
     {
@@ -58,8 +58,8 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
                 throw new ArgumentException($"Token Store token status message: {tokenStoreToken.Status.Error.Message}"); // If token already exists, but is not authenticated 
             }
         }
-        else
-        { // Specified token does not exist or msi does not have permission to "get" tokens, so try to create a token keeping in mind that msi might not have permission to "create" tokens 
+        else // Specified token does not exist or msi does not have permission to "get" tokens, so try to create a token keeping in mind that msi might not have permission to "create" tokens 
+        { 
                 throw(await create_token(tokenResourceUrl, tokenStoreApiToken, tokenStoreResource));
         }
     }
@@ -102,7 +102,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     /// <summary>
     /// If Id_provider = "aad", the token name is built from the tenant Id and object Id. 
     /// </summary>
-    public string get_aad_tokenpath(string header_token, TokenStoreBindingAttribute arg) // Token name based on tenant and object IDs 
+    public string get_aad_tokenpath(string header_token, TokenStoreBindingAttribute attribute) // Token name based on tenant and object IDs 
     {
         JwtSecurityTokenHandler JwtHandler = new JwtSecurityTokenHandler();
         if (!JwtHandler.CanReadToken(header_token))
@@ -126,19 +126,19 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         else if (objectID == null)
             throw new ArgumentException("AAD Token Error: ObjectID cannot be read");
         else
-            return $"{arg.Token_url}/tokens/{objectID}"; // token uri, TODO: Naming convention should be {tenantID}-{objectID} (currently too long)
+            return $"{attribute.Token_url}/tokens/{objectID}"; // token uri, TODO: Naming convention should be {tenantID}-{objectID} (currently too long)
     }
 
     /// <summary>
     /// If Id_provider = "facebook", the token name is built from the facebook id. 
     /// </summary>
-    public string get_facebook_tokenpath(string header_token, TokenStoreBindingAttribute arg)
+    public string get_facebook_tokenpath(string header_token, TokenStoreBindingAttribute attribute)
     {
         try
         {
             var fb = new FacebookClient(header_token);
             var result = (IDictionary<string, object>)fb.Get("/me?fields=id");
-            return $"{arg.Token_url}/tokens/{(string)result["id"]}"; // Token uri 
+            return $"{attribute.Token_url}/tokens/{(string)result["id"]}"; // Token uri 
         }
         catch (FacebookOAuthException)
         {
@@ -149,7 +149,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     /// <summary>
     /// If Id_provider = "google", the token name is built from the sub id. 
     /// </summary>
-    public string get_google_tokenpath(string header_token, TokenStoreBindingAttribute arg) // Token name based on sub (i.e. the google user id) 
+    public string get_google_tokenpath(string header_token, TokenStoreBindingAttribute attribute) // Token name based on sub (i.e. the google user id) 
     {
         JwtSecurityTokenHandler JwtHandler = new JwtSecurityTokenHandler();
         if (!JwtHandler.CanReadToken(header_token))
@@ -168,7 +168,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
 
         if (user_id == null)
             throw new ArgumentException("Could not read user id from Google ID token.");
-        return $"{arg.Token_url}/tokens/{user_id}"; // Token uri 
+        return $"{attribute.Token_url}/tokens/{user_id}"; // Token uri 
     }
 
     // ***********************************************************************************************************************************************
@@ -177,30 +177,31 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     /// <summary>
     /// Main function for Token Store Binding logic. Returns an access token for specified service, or creates a token if it does not exist. 
     /// </summary>
-    private async Task<String> BuildItemFromAttribute(TokenStoreBindingAttribute arg, ValueBindingContext arg2)
+    private async Task<String> BuildItemFromAttribute(TokenStoreBindingAttribute attribute, ValueBindingContext arg2)
     {
+        attribute.CheckValidity_URL();
         // Extract resource url from provided url path to token 
-        Uri tokenURI = new Uri(arg.Token_url);
+        Uri tokenURI = new Uri(attribute.Token_url);
         string path = tokenURI.Authority;
         string tokenStoreResource = $"https://{tokenURI.Authority}"; // Format: "https://{token-store-name}.tokenstore.azure.net"
-        string tokenResourceUrl = arg.Token_url; // for user scienario only specify path up to service, for msi scienario specify path up to token name  
+        string tokenResourceUrl = attribute.Token_url; // for user scienario only specify path up to service, for msi scienario specify path up to token name  
 
         try
         {
-            if (arg.Auth_flag.ToLower() == "user") // If Flag = "USER" or "user" 
+            if (attribute.Auth_flag.ToLower() == "user") // If Flag = "USER" or "user" 
             {
-                string header_token = arg.RequestHeader; // Access or ID token retrieved from header
+                string header_token = attribute.RequestHeader; // Access or ID token retrieved from header
                 // Build path to token 
-                switch (arg.Identity_provider.ToLower()) 
+                switch (attribute.Identity_provider.ToLower()) 
                 {
                     case "aad":
-                        tokenResourceUrl = get_aad_tokenpath(header_token, arg);
+                        tokenResourceUrl = get_aad_tokenpath(header_token, attribute);
                         break;
                     case "facebook":
-                        tokenResourceUrl = get_facebook_tokenpath(header_token, arg);
+                        tokenResourceUrl = get_facebook_tokenpath(header_token, attribute);
                         break;
                     case "google":
-                        tokenResourceUrl = get_google_tokenpath(header_token, arg);
+                        tokenResourceUrl = get_google_tokenpath(header_token, attribute);
                         break;
                     default:
                         throw new InvalidOperationException("Incorrect usage of Identity_provider parameter. Input must be of type ID_providers enum which currently supports aad, facebook, and google");
@@ -208,7 +209,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
             }
 
             // Shared logic for If Auth_Flag = "msi" or "user"
-            if (arg.Auth_flag.ToLower() == "msi" || arg.Auth_flag.ToLower() == "user")
+            if (attribute.Auth_flag.ToLower() == "msi" || attribute.Auth_flag.ToLower() == "user")
             {
                 try
                 {
