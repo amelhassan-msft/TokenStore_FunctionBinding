@@ -31,7 +31,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     /// <summary>
     /// Get a token if it exists, otherwise create a token and prompt user to navigate to Token Store to login.  
     /// </summary>
-    public async Task<String> get_or_create_token(string tokenResourceUrl, string tokenStoreResource)
+    public async Task<String> get_or_create_token(string tokenResourceUrl, string tokenStoreResource, string Identity_provider)
     {
         var azureServiceTokenProvider = new AzureServiceTokenProvider();
         string tokenStoreApiToken = await azureServiceTokenProvider.GetAccessTokenAsync(tokenStoreResource); // Get a token to access Token Store
@@ -60,14 +60,14 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         }
         else // Specified token does not exist or msi does not have permission to "get" tokens, so try to create a token keeping in mind that msi might not have permission to "create" tokens 
         { 
-                throw(await create_token(tokenResourceUrl, tokenStoreApiToken, tokenStoreResource));
+                throw(await create_token(tokenResourceUrl, tokenStoreApiToken, tokenStoreResource, Identity_provider));
         }
     }
 
     /// <summary>
     /// Create a token either with specified token name or with the user's ID. Prompt user to navigate to Token Store to authenticate the token. 
     /// </summary>
-    public async Task<Exception> create_token(string tokenResourceUrl, string tokenStoreApiToken, string tokenStoreResource)
+    public async Task<Exception> create_token(string tokenResourceUrl, string tokenStoreApiToken, string tokenStoreResource, string Identity_provider)
     {
         HttpClient client = new HttpClient();
         var request = new HttpRequestMessage(System.Net.Http.HttpMethod.Put, tokenResourceUrl);
@@ -75,7 +75,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
 
         // Get token name based on url 
         int pos = tokenResourceUrl.LastIndexOf("/") + 1;
-        var tokenId = tokenResourceUrl.Substring(pos, tokenResourceUrl.Length - pos); // TODO: Should the display name differ from the token name ? 
+        var tokenId = Identity_provider + "-" + tokenResourceUrl.Substring(pos, tokenResourceUrl.Length - pos); 
  
         var requestContent = JObject.FromObject(new
         {
@@ -213,7 +213,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
             {
                 try
                 {
-                    return await get_or_create_token(tokenResourceUrl, tokenStoreResource);
+                    return await get_or_create_token(tokenResourceUrl, tokenStoreResource, attribute.Identity_provider);
                 }
                 catch(Exception exp)
                 {

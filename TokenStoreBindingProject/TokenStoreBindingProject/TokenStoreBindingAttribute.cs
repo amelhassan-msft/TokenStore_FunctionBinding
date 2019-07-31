@@ -52,7 +52,11 @@ namespace Microsoft.Azure.WebJobs
         /// </summary>
         [AutoResolve(Default = "aad")]
         public string Identity_provider { get; set; } // options: aad, google, or facebook
+        // ****************************
 
+        /// <summary>
+        /// Check that the token url is well formatted and matches with the choice of the Auth_flag 
+        /// </summary>
         public void CheckValidity_URL()
         {
             var msi_regex = "^https://[a-zA-Z0-9_.-]*.tokenstore.azure.net/services/[a-zA-Z0-9_.-]*/tokens/[a-zA-Z0-9_.-]*$";
@@ -74,12 +78,11 @@ namespace Microsoft.Azure.WebJobs
                     break;
             }
         }
-            // ****************************
 
-            /// <summary>
-            /// Constructor for imperative bindings. 
-            /// </summary>
-            public TokenStoreBindingAttribute(string Token_url_in, string Auth_flag_in, string Identity_provider_in) 
+        /// <summary>
+        /// Constructor for imperative bindings. 
+        /// </summary>
+        public TokenStoreBindingAttribute(string Token_url_in, string Auth_flag_in, string Identity_provider_in) 
         {
             Token_url = Token_url_in;
             Auth_flag = Auth_flag_in;
