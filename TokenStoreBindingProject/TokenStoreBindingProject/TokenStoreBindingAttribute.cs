@@ -34,28 +34,51 @@ namespace Microsoft.Azure.WebJobs
     public sealed class TokenStoreBindingAttribute : Attribute
     {
         [AutoResolve(ResolutionPolicyType = typeof(EasyAuthAccessTokenResolutionPolicy))]  
-        public string EasyAuthAccessToken { get; set; } = "auto"; // Needs to be set to non-null value to be resolved, where the return value for token is stored 
+        public string RequestHeader { get; set; } = "auto"; // Needs to be set to non-null value to be resolved, the return value for the header is stored here
 
         // **** INPUT PARAMETERS ****
+
+        /// <summary>
+        /// If Auth_flag = "msi", Token_url should be full path to token name. If Auth_flag = "user", Token_url should be path up to service name. 
+        /// </summary>
         [AutoResolve]
         public string Token_url { get; set; }
+
+        /// <summary>
+        /// If Auth_flag = "msi" authentication to Token Store is obtained using the app's identity. If Auth_flag = "user" authentication to Token Store is obtained using the user's credentials. 
+        /// </summary>
         [AutoResolve (Default = "msi")]
         public string Auth_flag { get; set; } // options: msi or user 
+
+        /// <summary>
+        /// Determines how user credentials are obtained. Login options currently supported are: "aad", "google", or "facebook". 
+        /// </summary>
         [AutoResolve(Default = "aad")]
-        public string Identity_provider { get; set; } // options: aad, google, or facebook (see enum definition below) 
+        public string Identity_provider { get; set; } // options: aad, google, or facebook
+
         // ****************************
 
-        public TokenStoreBindingAttribute(string Token_url_in, string Auth_flag_in, string Identity_provider_in) // For imperative bindings, constructor
+        /// <summary>
+        /// Constructor for imperative bindings. 
+        /// </summary>
+        public TokenStoreBindingAttribute(string Token_url_in, string Auth_flag_in, string Identity_provider_in) 
         {
             Token_url = Token_url_in;
             Auth_flag = Auth_flag_in;
             Identity_provider = Identity_provider_in;
         }
-        public TokenStoreBindingAttribute() // For declarative bindings, constructor
+
+        /// <summary>
+        /// Constructor for declarative bindings.  
+        /// </summary>
+        public TokenStoreBindingAttribute()
         {
 
         }
 
+        /// <summary>
+        /// Obtains HttpRequest and header.  
+        /// </summary>
         internal class EasyAuthAccessTokenResolutionPolicy : IResolutionPolicy
         {
             public string TemplateBind(PropertyInfo propInfo, Attribute resolvedAttribute, BindingTemplate bindingTemplate, IReadOnlyDictionary<string, object> bindingData) // most important params are resolvedAttribute and bindingData 
@@ -74,12 +97,15 @@ namespace Microsoft.Azure.WebJobs
                         throw new InvalidOperationException($"Http request not accessible. An Auth_flag of user requires the use of an Http triggered function.");
                     }
                     var request = (HttpRequest)bindingData["$request"];
-                    return GetEasyAuthAccessToken(request, tokenAttribute.Identity_provider);  // returns to EasyAuthAccessToken variable 
+                    return GetRequestHeader(request, tokenAttribute.Identity_provider);  // returns to EasyAuthAccessToken variable 
                 }
                 return "NULL"; // Header value is not required for an Auth_flag of "msi" 
             }
 
-            private string GetEasyAuthAccessToken(HttpRequest request, string Identity_provider)
+            /// <summary>
+            /// Returns a header string depending on the specified login service.  
+            /// </summary>
+            private string GetRequestHeader(HttpRequest request, string Identity_provider)
             {
                 string errorMessage = $"Failed accessing request header. Cannot find an access token for the user. Verify that this endpoint is protected by the specified identity provider: {Identity_provider}.";
                 StringValues headerValues;
@@ -99,7 +125,7 @@ namespace Microsoft.Azure.WebJobs
                             return headerValues.FirstOrDefault();
                         break;
                     default:
-                        throw new InvalidOperationException("Incorrect usage of Identity_provider parameter. Input must be of type string: \"aad\", \"facebook\", and \"google\" ");
+                        throw new FormatException("Incorrect usage of Identity_provider parameter. Input must be of type string: \"aad\", \"facebook\", or \"google\" ");
                 }
 
                 throw new InvalidOperationException(errorMessage);

@@ -9,12 +9,9 @@ using Microsoft.Azure.WebJobs.Host.Bindings;
 using Microsoft.Azure.WebJobs.Host.Config; // must include for IExtensionConfigProvider 
 using Microsoft.Graph;
 using Newtonsoft.Json;
-using System.Linq;
-using Microsoft.Extensions.Primitives;
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Web;
 using Newtonsoft.Json.Linq;
 using System.Text;
 using Facebook;
@@ -30,6 +27,10 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     }
 
     // ******************************************** Token Store Helper Functions ********************************************************
+
+    /// <summary>
+    /// Get a token if it exists, otherwise create a token and prompt user to navigate to Token Store and login.  
+    /// </summary>
     public async Task<String> get_or_create_token(string tokenResourceUrl, string tokenStoreResource)
     {
         var azureServiceTokenProvider = new AzureServiceTokenProvider();
@@ -62,6 +63,10 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
                 throw(await create_token(tokenResourceUrl, tokenStoreApiToken, tokenStoreResource));
         }
     }
+
+    /// <summary>
+    /// Create a token either with specified token name or with the user's ID. Prompt user to navigate to Token Store to authenticate the token. 
+    /// </summary>
     public async Task<Exception> create_token(string tokenResourceUrl, string tokenStoreApiToken, string tokenStoreResource)
     {
         HttpClient client = new HttpClient();
@@ -92,7 +97,11 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     }
 
     // ***************************************************************************************************************************************************
+
     // ***************************** Functions to deal with headers and extract token name based on ID Provider ******************************************
+    /// <summary>
+    /// If Id_provider = "aad", the token name is built from the tenant Id and object Id. 
+    /// </summary>
     public string get_aad_tokenpath(string header_token, TokenStoreBindingAttribute arg) // Token name based on tenant and object IDs 
     {
         JwtSecurityTokenHandler JwtHandler = new JwtSecurityTokenHandler();
@@ -120,6 +129,9 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
             return $"{arg.Token_url}/tokens/{objectID}"; // token uri, TODO: Naming convention should be {tenantID}-{objectID} (currently too long)
     }
 
+    /// <summary>
+    /// If Id_provider = "facebook", the token name is built from the facebook id. 
+    /// </summary>
     public string get_facebook_tokenpath(string header_token, TokenStoreBindingAttribute arg)
     {
         try
@@ -134,6 +146,9 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         }
     }
 
+    /// <summary>
+    /// If Id_provider = "google", the token name is built from the sub id. 
+    /// </summary>
     public string get_google_tokenpath(string header_token, TokenStoreBindingAttribute arg) // Token name based on sub (i.e. the google user id) 
     {
         JwtSecurityTokenHandler JwtHandler = new JwtSecurityTokenHandler();
@@ -158,7 +173,10 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
 
     // ***********************************************************************************************************************************************
 
-    // ******************************************* MAIN FUNCTION: TokenStore Binding Logic ***********************************************************
+    // ******************************************* MAIN FUNCTION ***********************************************************
+    /// <summary>
+    /// Main function for Token Store Binding logic. Returns an access token for specified service, or creates a token if it does not exist. 
+    /// </summary>
     private async Task<String> BuildItemFromAttribute(TokenStoreBindingAttribute arg, ValueBindingContext arg2)
     {
         // Extract resource url from provided url path to token 
@@ -171,7 +189,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         {
             if (arg.Auth_flag.ToLower() == "user") // If Flag = "USER" or "user" 
             {
-                string header_token = arg.EasyAuthAccessToken; // Access or ID token retrieved from header
+                string header_token = arg.RequestHeader; // Access or ID token retrieved from header
                 // Build path to token 
                 switch (arg.Identity_provider.ToLower()) 
                 {
@@ -213,7 +231,9 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
 
 }
 
-// *********************** Token json object definition ****************************************
+/// <summary>
+/// Token json object definition. 
+/// </summary>
 public class Token
 
 {
