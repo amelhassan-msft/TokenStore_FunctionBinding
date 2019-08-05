@@ -48,10 +48,11 @@ namespace Microsoft.Azure.WebJobs
         public string Auth_flag { get; set; } // options: msi or user 
 
         /// <summary>
-        /// Determines how user credentials are obtained. Login options currently supported are: "aad", "google", or "facebook". 
+        /// Determines how user credentials are obtained. Login options currently supported are: "aad", "microsoft", "facebook", "google", or "twitter". 
         /// </summary>
         [AutoResolve(Default = "aad")]
-        public string Identity_provider { get; set; } // options: aad, google, or facebook
+        public string Identity_provider { get; set; } // options: "aad", "microsoft", "facebook", "google", or "twitter"
+
         // ****************************
 
         /// <summary>
@@ -118,7 +119,7 @@ namespace Microsoft.Azure.WebJobs
                         throw new InvalidOperationException($"Http request not accessible. An Auth_flag of user requires the use of an Http triggered function.");
                     }
                     var request = (HttpRequest)bindingData["$request"];
-                    return GetRequestHeader(request, tokenAttribute.Identity_provider);  // returns to EasyAuthAccessToken variable 
+                    return GetRequestHeader(request, tokenAttribute.Identity_provider);  // returns to RequestHeader variable 
                 }
                 return "NULL"; // Header value is not required for an Auth_flag of "msi" 
             }
@@ -137,6 +138,10 @@ namespace Microsoft.Azure.WebJobs
                         if (request.Headers.TryGetValue("X-MS-TOKEN-AAD-ID-TOKEN", out headerValues))
                             return headerValues.ToString();
                         break;
+                    case "microsoft":
+                        if (request.Headers.TryGetValue("X-MS-TOKEN-MICROSOFTACCOUNT-ACCESS-TOKEN", out headerValues))
+                            return headerValues.ToString();
+                        break;
                     case "facebook":
                         if (request.Headers.TryGetValue("X-MS-TOKEN-FACEBOOK-ACCESS-TOKEN", out headerValues))
                             return headerValues.ToString();
@@ -145,16 +150,18 @@ namespace Microsoft.Azure.WebJobs
                         if (request.Headers.TryGetValue("X-MS-TOKEN-GOOGLE-ID-TOKEN", out headerValues))
                             return headerValues.FirstOrDefault();
                         break;
+                    case "twitter":
+                        if (request.Headers.TryGetValue("X-MS-TOKEN-TWITTER-ACCESS-TOKEN", out headerValues))
+                            return headerValues.FirstOrDefault();
+                        break;
                     default:
-                        throw new FormatException("Incorrect usage of Identity_provider parameter. Input must be of type string: \"aad\", \"facebook\", or \"google\" ");
+                        throw new FormatException("Incorrect usage of Identity_provider parameter. Input must be of type string: \"aad\", \"microsoft\", \"facebook\", \"google\", or \"twitter\" ");
                 }
 
                 throw new InvalidOperationException(errorMessage);
             }
   
         }
-
     }
 
-    public enum ID_Providers { aad, facebook, google }
 }

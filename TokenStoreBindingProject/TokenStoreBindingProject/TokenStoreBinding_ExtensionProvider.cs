@@ -20,6 +20,7 @@ using System.Collections.Generic;
 [Extension("TokenStoreTest")]
 public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
 {
+    public string token_display_name = "empty";
     public void Initialize(ExtensionConfigContext context)
     {
         var rule = context.AddBindingRule<TokenStoreBindingAttribute>();
@@ -74,12 +75,12 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenStoreApiToken);
 
         // Get token name based on url 
-        int pos = tokenResourceUrl.LastIndexOf("/") + 1;
-        var tokenId = Identity_provider + "-" + tokenResourceUrl.Substring(pos, tokenResourceUrl.Length - pos); 
+        //int pos = tokenResourceUrl.LastIndexOf("/") + 1;
+        //var tokenId = Identity_provider + "-" + tokenResourceUrl.Substring(pos, tokenResourceUrl.Length - pos); 
  
         var requestContent = JObject.FromObject(new
         {
-            displayName = tokenId
+            displayName = token_display_name
         });
 
         request.Content = new StringContent(requestContent.ToString(), Encoding.UTF8, "application/json");
@@ -87,7 +88,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         var responseStr = await response.Content.ReadAsStringAsync(); // Provides details of created token
 
         if (response.IsSuccessStatusCode) // Token was succesfully created 
-            throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. Specified token does not exist. A new token with displayname {tokenId} was created. Navagiate to your Token Store to login. Further details: {responseStr}");
+            throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. Specified token does not exist. A new token with displayname {token_display_name} was created. Navigate to {tokenResourceUrl}/login to login. Further details: {responseStr}");
         else  // msi does not have permission to create tokens in this token store 
             throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. MSI does not have \"get\" and/or \"create\" permission for the following token store: {tokenStoreResource}. Further details: {responseStr}");
         
@@ -100,6 +101,7 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
 
     // ***************************** Functions to deal with headers and extract token name based on ID Provider ******************************************
     /// <summary>
+    /// If Id_provider = "aad", the token name is built from the tenant Id and object Id. 
     /// If Id_provider = "aad", the token name is built from the tenant Id and object Id. 
     /// </summary>
     public string get_aad_tokenpath(string header_token, TokenStoreBindingAttribute attribute) // Token name based on tenant and object IDs 
@@ -119,6 +121,8 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
                 tenantID = claim.Value;
             if (claim.Type == "oid")
                 objectID = claim.Value;
+            if (claim.Type == "upn")
+                token_display_name = claim.Value;
         }
 
         if (tenantID == null)
@@ -130,6 +134,15 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
     }
 
     /// <summary>
+    /// If Id_provider = "microsoft", the token name is built from the object id. 
+    /// </summary>
+    public string get_microsoft_tokenpath(string header_token, TokenStoreBindingAttribute attribute) // TODO: FIX
+    {
+        return null;
+    }
+
+
+    /// <summary>
     /// If Id_provider = "facebook", the token name is built from the facebook id. 
     /// </summary>
     public string get_facebook_tokenpath(string header_token, TokenStoreBindingAttribute attribute)
@@ -138,6 +151,8 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         {
             var fb = new FacebookClient(header_token);
             var result = (IDictionary<string, object>)fb.Get("/me?fields=id");
+            var username = (IDictionary<string, object>)fb.Get("/me?fields=name");
+            token_display_name = "Facebook: " + (string)username["name"];
             return $"{attribute.Token_url}/tokens/{(string)result["id"]}"; // Token uri 
         }
         catch (FacebookOAuthException)
@@ -164,6 +179,8 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         {
             if (claim.Type == "sub")
                 user_id = claim.Value;
+            if (claim.Type == "email")
+                token_display_name = claim.Value;
         }
 
         if (user_id == null)
@@ -171,6 +188,13 @@ public class TokenStoreBinding_ExtensionProvider : IExtensionConfigProvider
         return $"{attribute.Token_url}/tokens/{user_id}"; // Token uri 
     }
 
+    /// <summary>
+    /// If Id_provider = "twitter", the token name is built from the twitter id. 
+    /// </summary>
+    public string get_twitter_tokenpath(string header_token, TokenStoreBindingAttribute attribute) // TODO: FIX
+    {
+        return null;
+    }
     // ***********************************************************************************************************************************************
 
     // ******************************************* MAIN FUNCTION ***********************************************************
