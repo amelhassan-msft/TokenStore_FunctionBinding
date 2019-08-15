@@ -12,7 +12,7 @@ namespace MyFirstCustomBindingLibrary
                 throw new ArgumentNullException(nameof(builder));
             }
 
-            builder.AddExtension<TokenStoreBinding_ExtensionProvider>();
+            builder.AddExtension<TokenStoreInputBinding_ExtensionProvider>();
             return builder;
         }
     }
