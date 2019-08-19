@@ -100,6 +100,8 @@
         /// </summary>
         internal class EasyAuthAccessTokenResolutionPolicy : IResolutionPolicy
         {
+            // TODO: IResolutionPolicy says obsolete?
+
             public string TemplateBind(PropertyInfo propInfo, Attribute resolvedAttribute, BindingTemplate bindingTemplate, IReadOnlyDictionary<string, object> bindingData) // most important params are resolvedAttribute and bindingData 
             {
 
@@ -126,6 +128,7 @@
             /// </summary>
             private string GetRequestHeader(HttpRequest request, string identityProvider)
             {
+                //TODO: A better name for this method might be GetIdentityProviderToken
                 string errorMessage = $"Failed accessing request header. Cannot find an access token for the user. Verify that this endpoint is protected by the specified identity provider: {identityProvider}.";
                 StringValues headerValues;
 

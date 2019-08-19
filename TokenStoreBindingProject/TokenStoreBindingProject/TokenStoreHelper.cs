@@ -38,6 +38,7 @@ namespace Microsoft.Azure.WebJobs
             string tokenStoreResource = $"https://{tokenURI.Authority}"; // Format: "https://{token-store-name}.tokenstore.azure.net"
 
             var azureServiceTokenProvider = new AzureServiceTokenProvider();
+            // TODO: Note that this uses MSI to get the token
             string tokenStoreApiToken = await azureServiceTokenProvider.GetAccessTokenAsync(tokenStoreResource); // Get a token to access Token Store
 
             // Get token from Token Store
@@ -47,6 +48,7 @@ namespace Microsoft.Azure.WebJobs
             HttpResponseMessage response = await client.SendAsync(request);
 
             Token tokenStoreToken;
+            
             if (response.IsSuccessStatusCode) // Specified token exists and msi has permission to "get" tokens  
             {
                 var serviceApiToken = await response.Content.ReadAsStringAsync();
@@ -62,17 +64,23 @@ namespace Microsoft.Azure.WebJobs
                     throw new ArgumentException($"Token Store token status message: {tokenStoreToken.Status.Error.Message}"); // If token already exists, but is not authenticated 
                 }
             }
+            // TODO: Check specifically for StatusCode 404 Not Found
             else // Specified token does not exist or msi does not have permission to "get" tokens, so try to create a token keeping in mind that msi might not have permission to "create" tokens 
             {
-                throw (await create_token(tokenStoreApiToken, tokenStoreResource));
+                await create_token(tokenStoreApiToken, tokenStoreResource);
             }
         }
 
         /// <summary>
         /// Create a token either with specified token name or with the user's ID. Prompt user to navigate to Token Store to authenticate the token. 
         /// </summary>
-        public async Task<Exception> create_token(string tokenStoreApiToken, string tokenStoreResource)
+        public async Task create_token(string tokenStoreApiToken, string tokenStoreResource)
         {
+            // TODO: Can/should this method be private?
+
+            // TODO: Make HttpClient a static
+            // private static HttpClient _httpClient = new HttpClient();
+
             HttpClient client = new HttpClient();
             var request = new HttpRequestMessage(System.Net.Http.HttpMethod.Put, tokenResourceUrl);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenStoreApiToken);
@@ -87,7 +95,7 @@ namespace Microsoft.Azure.WebJobs
             var responseStr = await response.Content.ReadAsStringAsync(); // Provides details of created token
 
             if (response.IsSuccessStatusCode) // Token was succesfully created 
-                throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. Specified token does not exist. A new token with displayname {tokenDisplayName} was created. Navigate to {tokenResourceUrl}/login to login. Further details: {responseStr}");
+                throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. Specified token did not exist. A new token with displayname {tokenDisplayName} was created. Navigate to {tokenResourceUrl}/login to login. Further details: {responseStr}");
             else  // msi does not have permission to create tokens in this token store 
                 throw new ArgumentException($"Http response message status code: {response.StatusCode.ToString()}. MSI does not have \"get\" and/or \"create\" permission for the following token store: {tokenStoreResource}. Further details: {responseStr}");
 
