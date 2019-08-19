@@ -42,7 +42,8 @@ namespace Microsoft.Azure.WebJobs
 
         /// <summary>
         /// If Id_provider = "aad", the token name is built from the tenant Id and object Id. 
-        /// If Id_provider = "aad", the token name is built from the tenant Id and object Id. 
+        /// Example: If tenantId = 72f988bf-86f1-41af-91ab-2d7cd011db47 and ObjectId = d6f2046f-f23c-49ba-9a29-8e54b220a11f, 
+        /// token name is computed as [tenantId]-[objectId], 72f988bf-86f1-41af-91ab-2d7cd011db47-d6f2046f-f23c-49ba-9a29-8e54b220a11f
         /// </summary>
         private void GetAadTokenPath(string header_token, TokenStoreInputBindingAttribute attribute) // Token name based on tenant and object IDs 
         {
@@ -83,7 +84,8 @@ namespace Microsoft.Azure.WebJobs
                 var fb = new FacebookClient(header_token);
                 var result = (IDictionary<string, object>)fb.Get("/me?fields=id");
                 var username = (IDictionary<string, object>)fb.Get("/me?fields=name");
-                tokenDisplayName = "Facebook: " + (string)username["name"];
+                // TODO: Why is the facebook display name prefixed but the others are not?
+                tokenDisplayName = "Facebook: " + (string)username["name"];                
                 tokenResourceUrl = $"{attribute.tokenUrl}/tokens/{(string)result["id"]}"; // Token uri 
             }
             catch (FacebookOAuthException)
@@ -102,12 +104,15 @@ namespace Microsoft.Azure.WebJobs
                 throw new ArgumentException("Google ID token cannot be read as JWT");
 
             var securityToken = JwtHandler.ReadJwtToken(header_token);
+
+            // TODO: Add check here if security token is null
             var payload = securityToken.Payload; // extract payload data 
 
             string user_id = null;
 
             foreach (Claim claim in payload.Claims)
             {
+                // TODO: Add a comment for what these mean?
                 if (claim.Type == "sub")
                     user_id = claim.Value;
                 if (claim.Type == "email")
@@ -117,6 +122,8 @@ namespace Microsoft.Azure.WebJobs
             if (user_id == null)
                 throw new ArgumentException("Could not read user id from Google ID token.");
             tokenResourceUrl = $"{attribute.tokenUrl}/tokens/{user_id}"; // Token uri 
+
+            //TODO: Add a catch all exception here similar to facebook?
         }
     }
 }

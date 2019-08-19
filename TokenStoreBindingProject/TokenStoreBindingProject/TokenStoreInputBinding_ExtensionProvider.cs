@@ -33,11 +33,11 @@ public class TokenStoreInputBinding_ExtensionProvider : IExtensionConfigProvider
     private async Task<String> BuildItemFromAttribute(TokenStoreInputBindingAttribute attribute, ValueBindingContext arg2)
     {
         attribute.CheckValidity_URL();
-        string tokenResourceUrl = attribute.tokenUrl; // for user scienario only specify path up to service, for msi scienario specify path up to token name  
+        string tokenResourceUrl = attribute.tokenUrl; // for user scenario only specify path up to service, for msi scienario specify path up to token name  
 
-        // Deafault token display name 
-        int pos = tokenResourceUrl.LastIndexOf("/") + 1;
-        var tokenId = tokenResourceUrl.Substring(pos, tokenResourceUrl.Length - pos); 
+        // default token display name 
+        int pos = tokenResourceUrl.LastIndexOf("/") + 1;        
+        tokenDisplayName = tokenResourceUrl.Substring(pos, tokenResourceUrl.Length - pos); 
 
         try
         {

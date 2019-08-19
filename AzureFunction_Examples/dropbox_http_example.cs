@@ -16,7 +16,7 @@ public static class TestTokenStoreBinding_http
     [FunctionName("TestTokenStoreBinding_http")]
     public static async Task<IActionResult> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req,
-        ILogger log, [TokenStoreBinding(Token_url = "https://sample-token-store.westcentralus.tokenstore.azure.net/services/dropbox/tokens/sampleToken",
+        ILogger log, [TokenStoreBinding(Token_url = "https://sample-token-store.tokenstore.azure.net/services/dropbox/tokens/sampleToken",
         Auth_flag = "msi")] TokenBindingOutput tokenbindingoutput) // set input binding parameters
     {
         log.LogInformation("C# HTTP trigger function processed a request.");
