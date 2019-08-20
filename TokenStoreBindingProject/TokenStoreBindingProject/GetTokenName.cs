@@ -84,7 +84,7 @@ namespace Microsoft.Azure.WebJobs
                 var fb = new FacebookClient(header_token);
                 var result = (IDictionary<string, object>)fb.Get("/me?fields=id");
                 var username = (IDictionary<string, object>)fb.Get("/me?fields=name");
-                // TODO: Why is the facebook display name prefixed but the others are not?
+
                 tokenDisplayName = "Facebook: " + (string)username["name"];                
                 tokenResourceUrl = $"{attribute.tokenUrl}/tokens/{(string)result["id"]}"; // Token uri 
             }
@@ -104,26 +104,28 @@ namespace Microsoft.Azure.WebJobs
                 throw new ArgumentException("Google ID token cannot be read as JWT");
 
             var securityToken = JwtHandler.ReadJwtToken(header_token);
+            if (securityToken != null) {
+                try {
+                
+                    var payload = securityToken.Payload; // extract payload data 
+                    string user_id = null;
 
-            // TODO: Add check here if security token is null
-            var payload = securityToken.Payload; // extract payload data 
+                    foreach (Claim claim in payload.Claims) {
+                        if (claim.Type == "sub") // sub is the user's unique google id, this will be the token name 
+                            user_id = claim.Value; 
+                        if (claim.Type == "email") // this is the user's email, it will be the token's display name 
+                            tokenDisplayName = claim.Value;
+                    }
 
-            string user_id = null;
-
-            foreach (Claim claim in payload.Claims)
-            {
-                // TODO: Add a comment for what these mean?
-                if (claim.Type == "sub")
-                    user_id = claim.Value;
-                if (claim.Type == "email")
-                    tokenDisplayName = claim.Value;
+                    if (user_id == null)
+                        throw new ArgumentException("Could not read user id from Google ID token.");
+                    tokenResourceUrl = $"{attribute.tokenUrl}/tokens/{user_id}"; // Token uri 
+                }
+                catch (Exception exp) // Overall catch statement 
+                {
+                    throw new SystemException($"GetGoogleTokenPath Function Error: {exp}");
+                }
             }
-
-            if (user_id == null)
-                throw new ArgumentException("Could not read user id from Google ID token.");
-            tokenResourceUrl = $"{attribute.tokenUrl}/tokens/{user_id}"; // Token uri 
-
-            //TODO: Add a catch all exception here similar to facebook?
         }
     }
 }

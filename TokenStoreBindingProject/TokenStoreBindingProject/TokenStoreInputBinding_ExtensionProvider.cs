@@ -41,33 +41,33 @@ public class TokenStoreInputBinding_ExtensionProvider : IExtensionConfigProvider
 
         try
         {
-            if (attribute.authFlag.ToLower() == "user") // If Flag = "USER" or "user" 
+            if (attribute.scenario.ToLower() == "user") // If Flag = "USER" or "user" 
             {
                 GetTokenName getTokenName = new GetTokenName(attribute);
                 tokenResourceUrl = getTokenName.tokenResourceUrl;
                 tokenDisplayName = getTokenName.tokenDisplayName;
             }
 
-            // Shared logic for If authFlag = "msi" or "user"
-            if (attribute.authFlag.ToLower() == "msi" || attribute.authFlag.ToLower() == "user")
+            // Shared logic for If scenario = "tokenName" or "user"
+            if (attribute.scenario.ToLower() == "tokenname" || attribute.scenario.ToLower() == "user")
             {
                 try
                 {
                     // Use TokenStoreHelper to interact with your Token Store resource 
                     TokenStoreHelper tokenStoreHelper = new TokenStoreHelper(tokenResourceUrl, tokenDisplayName, attribute);
-                    return await tokenStoreHelper.get_or_create_token();
+                    return await tokenStoreHelper.GetOrCreateToken();
                 }
                 catch(Exception exp)
                 {
-                    throw new ArgumentException($"{exp}");
+                    throw new SystemException($"{exp}");
                 }
             }
-            else // error, incorrect usage of authFlag binding input  
-                throw new ArgumentException("Incorrect usage of authFlag binding input: Choose \"msi\" or \"user\" ");
+            else // error, incorrect usage of scenario binding input  
+                throw new ArgumentException("Incorrect usage of {scenario} binding input: Choose \"tokenName\" or \"user\" ");
         }
         catch (Exception exp) // Overall catch statement 
         {
-            throw new ArgumentException($"{exp}");
+            throw new SystemException($"{exp}");
         }
 
     }

@@ -11,21 +11,21 @@
     using System.Reflection;
     using System.Text.RegularExpressions;
 
-    /*
-        //////// TokenStoreInputBinding //////////
+    /// <summary>
+    /// TokenStoreInputBinding 
+    /// Usage: 
+    ///     If scenario = "tokenName" 
+    ///         1. Your Azure Function can be of any type 
+    ///         2. tokenUrl should be the full path to the token ( i.e. https://{example-tokenstore-name}.tokenstore.azure.net/services/{example-service}/tokens/{example-token-name} )
+    ///         3. The "identityProvider" parameter can be null
+    ///     If scenario = "user" 
+    ///         1. Your Azure Function must have an HTTP trigger 
+    ///         2. tokenUrl should be path up to service ( i.e. https://{example-tokenstore-name}.tokenstore.azure.net/services/{example-service} )
+    ///         3. Be sure to specify the "identityProc" parameter
+    /// Returns: An access token to the specified service if it exists and is authenticated. 
+    /// </summary>
+    /// 
 
-       Usage: 
-
-       If authFlag = MSI
-           1. Your Azure Function can be of any type 
-           2. tokenUrl should be the full path to the token ( i.e. https://{example-tokenstore-name}.tokenstore.azure.net/services/{example-service}/tokens/{example-token-name} )
-       If authFlag = user 
-           1. Your Azure Function must have an HTTP trigger 
-           2. tokenUrl should be path up to service ( i.e. https://{example-tokenstore-name}.tokenstore.azure.net/services/{example-service} )
-           3. Be sure to specify the "Id_provider" parameter
-
-       Returns: An access token to the specified service if it exists and is authenticated. 
-   */
     [Binding]
     public sealed class TokenStoreInputBindingAttribute : Attribute
     {
@@ -35,16 +35,16 @@
         // **** INPUT PARAMETERS ****
 
         /// <summary>
-        /// If authFlag = "msi", tokenUrl should be full path to token name. If authFlag = "user", tokenUrl should be path up to service name. 
+        /// If scenario = "tokenName", tokenUrl should be full path to token name. If scenario = "user", tokenUrl should be path up to service name. 
         /// </summary>
         [AutoResolve]
         public string tokenUrl { get; set; }
 
         /// <summary>
-        /// If authFlag = "msi" token is retrieved using the given full path url. If authFlag = "user" the token is retrieved by appending the given url with the logged in user's credentials. 
+        /// If scenario = "tokenName" token is retrieved using the given full path url. If scenario = "user" the token is retrieved by appending the given url with the logged in user's credentials. 
         /// </summary>
-        [AutoResolve (Default = "msi")]
-        public string authFlag { get; set; } // options: msi or user 
+        [AutoResolve (Default = "tokenName")]
+        public string scenario { get; set; } // options: "tokenName" or "user" 
 
         /// <summary>
         /// Determines how user credentials are obtained. Login options currently supported are: "aad", "facebook", or "google" . 
@@ -53,24 +53,24 @@
         public string identityProvider { get; set; } // options: "aad", "facebook", or "google"
 
         /// <summary>
-        /// Check that the token url is well formatted and matches with the choice of the authFlag 
+        /// Check that the token url is well formatted and matches with the choice of the scenario 
         /// </summary>
         public void CheckValidity_URL()
         {
-            var msi_regex = "^https://[a-zA-Z0-9_.-]*.tokenstore.azure.net/services/[a-zA-Z0-9_.-]*/tokens/[a-zA-Z0-9_.-]*$";
+            var tokenName_regex = "^https://[a-zA-Z0-9_.-]*.tokenstore.azure.net/services/[a-zA-Z0-9_.-]*/tokens/[a-zA-Z0-9_.-]*$";
             var user_regex = "^https://[a-zA-Z0-9_.-]*.tokenstore.azure.net/services/[a-zA-Z0-9_.-]*$";
 
-            switch (this.authFlag.ToLower())
+            switch (this.scenario.ToLower())
             {
-                case "msi":
-                    Match match_msi = Regex.Match(this.tokenUrl, msi_regex);
-                    if (!match_msi.Success)
-                        throw new FormatException("When using an authFlag of \"msi\" specify the token url up to the token name. Format: \"https://{token-store-name}.tokenstore.azure.net/services/{service-name}/tokens/{token-name}\" ");
+                case "tokenName":
+                    Match match_tokenName = Regex.Match(this.tokenUrl, tokenName_regex);
+                    if (!match_tokenName.Success)
+                        throw new FormatException("When using a scenario of \"tokenName\" specify the token url up to the token name. Format: \"https://{token-store-name}.tokenstore.azure.net/services/{service-name}/tokens/{token-name}\" ");
                     break;
                 case "user":
                     Match match_user = Regex.Match(this.tokenUrl, user_regex);
                     if (!match_user.Success)
-                        throw new FormatException("When using an authFlag of \"user\" specify the token url up to the service name. Format: \"https://{token-store-name}.tokenstore.azure.net/services/{service-name}\" ");
+                        throw new FormatException("When using a scenario of \"user\" specify the token url up to the service name. Format: \"https://{token-store-name}.tokenstore.azure.net/services/{service-name}\" ");
                     break;
                 default:
                     break;
@@ -80,10 +80,10 @@
         /// <summary>
         /// Constructor for imperative bindings. 
         /// </summary>
-        public TokenStoreInputBindingAttribute(string tokenUrlIn, string authFlagIn, string identityProviderIn) 
+        public TokenStoreInputBindingAttribute(string tokenUrlIn, string scenarioIn, string identityProviderIn) 
         {
             tokenUrl = tokenUrlIn;
-            authFlag = authFlagIn;
+            scenario = scenarioIn;
             identityProvider = identityProviderIn;
         }
 
@@ -100,8 +100,6 @@
         /// </summary>
         internal class EasyAuthAccessTokenResolutionPolicy : IResolutionPolicy
         {
-            // TODO: IResolutionPolicy says obsolete?
-
             public string TemplateBind(PropertyInfo propInfo, Attribute resolvedAttribute, BindingTemplate bindingTemplate, IReadOnlyDictionary<string, object> bindingData) // most important params are resolvedAttribute and bindingData 
             {
 
@@ -111,24 +109,23 @@
                     throw new InvalidOperationException($"Can not use {nameof(EasyAuthAccessTokenResolutionPolicy)} as a resolution policy for an attribute that does not implement {nameof(TokenStoreInputBindingAttribute)}");
                 }
 
-                if (tokenAttribute.authFlag.ToLower() == "user")
+                if (tokenAttribute.scenario.ToLower() == "user")
                 {
                     if (!(bindingData.ContainsKey("$request") && bindingData["$request"] is HttpRequest)) // If we can't get "request" from http request
                     {
-                        throw new InvalidOperationException($"Http request not accessible. An authFlag of user requires the use of an Http triggered function.");
+                        throw new InvalidOperationException($"Http request not accessible. A scenario of \"user\" requires the use of an Http triggered function.");
                     }
                     var request = (HttpRequest)bindingData["$request"];
-                    return GetRequestHeader(request, tokenAttribute.identityProvider);  // returns to RequestHeader variable 
+                    return GetIdentityProviderToken(request, tokenAttribute.identityProvider);  // returns to RequestHeader variable 
                 }
-                return null; // Header value is not required for an authFlag of "msi" 
+                return null; // Header value is not required for an scenario of "tokenName" 
             }
 
             /// <summary>
             /// Returns a header string depending on the specified login service.  
             /// </summary>
-            private string GetRequestHeader(HttpRequest request, string identityProvider)
+            private string GetIdentityProviderToken(HttpRequest request, string identityProvider)
             {
-                //TODO: A better name for this method might be GetIdentityProviderToken
                 string errorMessage = $"Failed accessing request header. Cannot find an access token for the user. Verify that this endpoint is protected by the specified identity provider: {identityProvider}.";
                 StringValues headerValues;
 
