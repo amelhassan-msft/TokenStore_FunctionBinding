@@ -10,7 +10,7 @@
     <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.2.0" />
     <PackageReference Include="Microsoft.Graph" Version="1.16.0" />
     <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="1.0.29" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="5.5.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="5.7.0" />
   </ItemGroup>
 
 </Project>
